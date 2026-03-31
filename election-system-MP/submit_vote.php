@@ -15,5 +15,10 @@ foreach ($_POST['vote'] as $position_id => $candidate_id) {
 
 }
 
+// Log the voting action
+$log_sql = "INSERT INTO voter_logs (user_id, election_id, action)
+            VALUES ('$user_id', '$election_id', 'Voted')";
+$conn->query($log_sql);
+
 echo "<script>alert('Vote submitted successfully!'); window.location='results.php';</script>";
 ?>

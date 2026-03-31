@@ -13,6 +13,7 @@ if (!isset($_SESSION['user_id'])) {
     <h2>Welcome, <?php echo $_SESSION['name']; ?>!</h2>
     <p>Your role: <?php echo $_SESSION['role']; ?></p>
     <a href="auth/logout.php"><button>Logout</button></a>
+    <a href="voter_logs.php"><button>View Voter Logs</button></a>
 </div>
 
 <a href="auth/candidate_register.php">

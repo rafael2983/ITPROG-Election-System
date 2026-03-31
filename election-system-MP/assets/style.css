@@ -74,3 +74,88 @@ textarea {
     font-size: 14px;
     resize: none;
 }
+
+/* =========================================
+   NEW: VOTER LOGS / AUDIT TRAIL STYLES
+========================================= */
+
+/* Wider container specifically for the logs table */
+.logs-container {
+    background: #ffffff;
+    padding: 40px;
+    width: 100%;
+    max-width: 900px; 
+    border-radius: 10px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    text-align: left; 
+}
+
+/* Back button matching your theme */
+.back-btn {
+    display: inline-block;
+    margin-bottom: 20px;
+    color: #1e3c72;
+    font-size: 14px;
+    padding: 8px 12px;
+    border: 1px solid #1e3c72;
+    border-radius: 6px;
+    transition: 0.3s ease;
+}
+
+.back-btn:hover {
+    background-color: #1e3c72;
+    color: white;
+    text-decoration: none;
+}
+
+/* Table Design */
+.logs-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.logs-table th, 
+.logs-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.logs-table th {
+    background-color: #1e3c72; 
+    color: white;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+}
+
+.logs-table th:first-child {
+    border-top-left-radius: 6px;
+}
+
+.logs-table th:last-child {
+    border-top-right-radius: 6px;
+}
+
+.logs-table tr:hover {
+    background-color: #f4f7f6; 
+}
+
+.logs-table td {
+    font-size: 14px;
+    color: #333;
+}
+
+.badge {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.badge-voted {
+    background-color: #e3f2fd; /* Light blue */
+    color: #1e3c72; /* Dark blue */
+    border: 1px solid #90caf9;
+}
