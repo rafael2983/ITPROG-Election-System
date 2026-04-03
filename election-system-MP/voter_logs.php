@@ -1,6 +1,12 @@
 <?php
 include("config/db.php");
 
+// Security: Prevent students from accessing logs
+if (!isset($_SESSION['role']) || ($_SESSION['role'] !== 'Election Manager' && $_SESSION['role'] !== 'Election Committee')) {
+    header("Location: dashboard.php");
+    exit();
+}
+
 $sql = "SELECT voter_logs.*, users.full_name, users.student_id, elections.title
         FROM voter_logs
         JOIN users ON voter_logs.user_id = users.id
