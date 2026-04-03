@@ -1,15 +1,21 @@
 <?php
 session_start();
 include("config/db.php");
-$check = $conn->query("SELECT * FROM votes 
-WHERE user_id='$user_id' AND election_id=1");
+
+// For security: Define user_id from session BEFORE running the duplicate check query
+if (!isset($_SESSION['user_id'])) {
+    header("Location: auth/login.php");
+    exit();
+}
+$user_id = $_SESSION['user_id'];
+
+
+$check = $conn->query("SELECT * FROM votes WHERE user_id='$user_id' AND election_id=1");
 
 if ($check->num_rows > 0) {
     echo "You have already voted in this election.";
     exit();
 }
-
-$user_id = $_SESSION['user_id'];
 
 $sql = "SELECT candidates.*, positions.position_name
         FROM candidates
@@ -18,19 +24,14 @@ $sql = "SELECT candidates.*, positions.position_name
         ORDER BY positions.position_name";
 
 $result = $conn->query($sql);
-
 $current_position = "";
 ?>
 
 <link rel="stylesheet" href="assets/style.css">
-
 <div class="container" style="width:700px;">
     <h2>Cast Your Vote</h2>
-
     <form method="POST" action="submit_vote.php" onsubmit="return confirmVote();">
-
         <?php while ($row = $result->fetch_assoc()): ?>
-
             <?php if ($current_position != $row['position_name']): ?>
                 <h3>
                     <?php echo $row['position_name']; ?>
@@ -40,15 +41,11 @@ $current_position = "";
 
             <label style="display:block;margin:10px 0;">
                 <input type="radio" name="vote[<?php echo $row['position']; ?>]" value="<?php echo $row['id']; ?>" required>
-
                 <img src="uploads/<?php echo $row['photo']; ?>" width="60">
                 <?php echo $row['name']; ?>
             </label>
-
         <?php endwhile; ?>
-
         <button type="submit">Submit Vote</button>
-
     </form>
 </div>
 
