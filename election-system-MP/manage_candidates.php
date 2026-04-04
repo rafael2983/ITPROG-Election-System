@@ -85,7 +85,7 @@ if (isset($_GET['view_id'])) {
                value="<?= htmlspecialchars($_GET['search'] ?? '') ?>"
                style="padding:6px 10px; width:300px;">
         <button type="submit">Search</button>
-        <a href="candidate_management.php"><button type="button">Clear</button></a>
+        <a href="manage_candidates.php"><button type="button">Clear</button></a>
         <a href="dashboard.php"><button type="button">Dashboard</button></a>
     </form>
 
@@ -118,7 +118,7 @@ if (isset($_GET['view_id'])) {
         </div>
 
         <div style="margin-top:14px;">
-            <a href="candidate_management.php<?= isset($_GET['search']) ? '?search=' . urlencode($_GET['search']) : '' ?>">
+            <a href="manage_candidates.php<?= isset($_GET['search']) ? '?search=' . urlencode($_GET['search']) : '' ?>">
                 <button type="button">Close</button>
             </a>
         </div>
