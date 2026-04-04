@@ -1,99 +1,207 @@
 <?php
 session_start();
 include("config/db.php");
-
-// Security: Only managers or admins access this page
-$role = strtolower($_SESSION['role'] ?? '');
-if ($role !== 'manager' && $role !== 'admin') {
-    header("Location: dashboard.php");
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
     exit();
 }
 
-// Handle Status Updates (Approve/Reject/Pending) 
-if (isset($_POST['action']) && isset($_POST['candidate_id'])) {
-    $new_status = $_POST['action']; 
-    $candidate_id = $_POST['candidate_id'];
+//Only Roles allowed to access this php: Committee, Manager, and Admin
+$allowed_roles = ['committee', 'manager', 'admin'];
+if (!in_array($_SESSION['role'], $allowed_roles)) {
+    header("Location: index.php");
+    exit();
+}
 
-    $stmt = $conn->prepare("UPDATE candidates SET status = ? WHERE id = ?");
-    $stmt->bind_param("si", $new_status, $candidate_id);
-    
-    if ($stmt->execute()) {
-        echo "<script>alert('Candidate status updated to $new_status!');</script>";
+//Approval of Candidates: Committee, Manager, and Admin
+if (isset($_GET['approve_id'])) {
+    $id = $_GET['approve_id'];
+    if ($conn->query("UPDATE candidates SET status='approved' WHERE id='$id'") === TRUE) {
+        echo "<script>alert('Candidate approved and added to the election.');</script>";
+    } else {
+        echo "Error: " . $conn->error;
     }
 }
 
-// Fetch all candidates for review 
-$sql = "SELECT candidates.*, positions.position_name 
-        FROM candidates 
-        LEFT JOIN positions ON candidates.position = positions.position_name
-        ORDER BY candidates.created_at ASC";
-$result = $conn->query($sql);
+//Rejection of Candidates: Committee, Manager, and Admin
+if (isset($_GET['reject_id'])) {
+    $id = $_GET['reject_id'];
+    if ($conn->query("UPDATE candidates SET status='rejected' WHERE id='$id'") === TRUE) {
+        echo "<script>alert('Candidate has been removed from the election.');</script>";
+    } else {
+        echo "Error: " . $conn->error;
+    }
+}
+
+//Removal of Candidates: Manager, and Admin
+if (isset($_GET['delete_id'])) {
+    if (in_array($_SESSION['role'], ['manager', 'admin'])) {
+        $id = $_GET['delete_id'];
+        if ($conn->query("DELETE FROM candidates WHERE id='$id'") === TRUE) {
+            echo "<script>alert('Candidate permanently deleted.');</script>";
+        } else {
+            echo "Error: " . $conn->error;
+        }
+    } else {
+        echo "<script>alert('Access denied. Only managers and admins can permanently delete candidates.');</script>";
+    }
+}
+
+
+$search = isset($_GET['search']) ? "%" . $_GET['search'] . "%" : "%";
+$candidates = $conn->query("
+    SELECT  c.id, c.name, c.student_id, c.email, c.position,
+            c.status, c.synopsis, c.photo, c.created_at
+    FROM    candidates c
+    JOIN    users u ON u.id = c.user_id
+    WHERE   c.name LIKE '$search' OR c.position LIKE '$search' OR c.student_id LIKE '$search'
+    ORDER BY c.position, c.name
+");
+
+
+$view_candidate = null;
+if (isset($_GET['view_id'])) {
+    $view_candidate = $conn->query("
+        SELECT c.*
+        FROM   candidates c
+        JOIN   users u ON u.id = c.user_id
+        WHERE  c.id='" . $_GET['view_id'] . "'
+    ")->fetch_assoc();
+}
 ?>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Manage Candidates</title>
-    <link rel="stylesheet" href="assets/style.css">
-</head>
-<body>
+<link rel="stylesheet" href="assets/style.css">
 
-<div class="container" style="width:950px;">
-    <a href="dashboard.php" style="text-decoration:none; color:#3498db;">← Back to Dashboard</a>
-    <table border="1" style="width:100%; border-collapse: collapse; margin-top:20px;">
-        <thead>
-            <tr style="background:#f4f4f4; text-align:left;">
-                <th style="padding:10px;">Photo</th>
-                <th style="padding:10px;">Name / ID</th>
-                <th style="padding:10px;">Position</th>
-                <th style="padding:10px;">Status</th>
-                <th style="padding:10px;">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php if ($result->num_rows > 0): ?>
-                <?php while($row = $result->fetch_assoc()): ?>
-                <tr>
-                    <td style="padding:10px; text-align:center;">
-                        <img src="uploads/<?php echo $row['photo']; ?>" width="50" height="50" style="border-radius:50%; object-fit:cover;">
-                    </td>
-                    <td style="padding:10px;">
-                        <strong><?php echo htmlspecialchars($row['name']); ?></strong><br>
-                        <small><?php echo htmlspecialchars($row['student_id']); ?></small>
-                    </td>
-                    <td style="padding:10px;"><?php echo htmlspecialchars($row['position_name'] ?? $row['position']); ?></td>
-                    <td style="padding:10px; text-align:center;">
-                        <span style="padding:4px 8px; border-radius:4px; font-size:0.8em; color:white; background: 
-                            <?php echo ($row['status'] == 'approved') ? '#27ae60' : (($row['status'] == 'rejected') ? '#e74c3c' : '#f39c12'); ?>;">
-                            <?php echo ucfirst($row['status']); ?>
-                        </span>
-                    </td>
-                    <td style="padding:10px;">
-                        <form method="POST" style="display:flex; gap:5px;">
-                            <input type="hidden" name="candidate_id" value="<?php echo $row['id']; ?>">
-                            
-                            <?php if ($row['status'] != 'approved'): ?>
-                                <button type="submit" name="action" value="approved" style="background:#27ae60; color:white; border:none; padding:5px 10px; cursor:pointer; font-size:0.8em;">Approve</button>
-                            <?php endif; ?>
+<div class="container" style="width:900px;">
 
-                            <?php if ($row['status'] != 'rejected'): ?>
-                                <button type="submit" name="action" value="rejected" style="background:#e74c3c; color:white; border:none; padding:5px 10px; cursor:pointer; font-size:0.8em;">Reject</button>
-                            <?php endif; ?>
+    <h2>Candidate Management</h2>
+    <p>Logged in as: <strong><?= htmlspecialchars($_SESSION['name'] ?? '') ?></strong>
+       &nbsp;|&nbsp; Role: <strong><?= htmlspecialchars($_SESSION['role']) ?></strong></p>
+    <hr style="margin:10px 0 16px;">
 
-                            <?php if ($row['status'] != 'pending'): ?>
-                                <button type="submit" name="action" value="pending" style="background:#f39c12; color:white; border:none; padding:5px 10px; cursor:pointer; font-size:0.8em;">Reset to Pending</button>
-                            <?php endif; ?>
-                        </form>
-                    </td>
-                </tr>
-                <?php endwhile; ?>
-            <?php else: ?>
-                <tr><td colspan="5" style="padding:20px; text-align:center;">No candidates registered.</td></tr>
+    <!-- Search for Candidate-->
+    <form method="GET" style="margin-bottom:16px;">
+        <input type="text" name="search" placeholder="Search by name, position, or student ID"
+               value="<?= htmlspecialchars($_GET['search'] ?? '') ?>"
+               style="padding:6px 10px; width:300px;">
+        <button type="submit">Search</button>
+        <a href="candidate_management.php"><button type="button">Clear</button></a>
+        <a href="dashboard.php"><button type="button">Dashboard</button></a>
+    </form>
+
+    <!-- Candidate Viewing -->
+    <?php if ($view_candidate): ?>
+    <div style="border:1px solid #ccc; border-radius:8px; padding:20px; margin-bottom:20px; background:#f9f9f9;">
+        <h3 style="margin-bottom:14px;">Candidate Details</h3>
+
+        <div style="display:flex; align-items:flex-start; gap:20px;">
+
+            <?php if ($view_candidate['photo']): ?>
+            <img src="../uploads/<?= htmlspecialchars($view_candidate['photo']) ?>"
+                 width="110" style="border-radius:8px; flex-shrink:0;" alt="Candidate Photo">
             <?php endif; ?>
-        </tbody>
-    </table>
-</div>
 
-</body>
-</html>
+            <div>
+                <p><strong>Name:</strong> <?= htmlspecialchars($view_candidate['name']) ?></p>
+                <p><strong>Student ID:</strong> <?= htmlspecialchars($view_candidate['student_id']) ?></p>
+                <p><strong>Email:</strong> <?= htmlspecialchars($view_candidate['email']) ?></p>
+                <p><strong>Position:</strong> <?= htmlspecialchars($view_candidate['position']) ?></p>
+                <p><strong>Status:</strong> <?= htmlspecialchars($view_candidate['status']) ?></p>
+                <p><strong>Date Added:</strong> <?= htmlspecialchars($view_candidate['created_at']) ?></p>
+            </div>
+
+        </div>
+
+        <div style="margin-top:14px;">
+            <strong>Synopsis:</strong><br>
+            <p style="margin-top:6px;"><?= nl2br(htmlspecialchars($view_candidate['synopsis'])) ?></p>
+        </div>
+
+        <div style="margin-top:14px;">
+            <a href="candidate_management.php<?= isset($_GET['search']) ? '?search=' . urlencode($_GET['search']) : '' ?>">
+                <button type="button">Close</button>
+            </a>
+        </div>
+        
+    </div>
+    <?php endif; ?>
+
+    <!-- Candidate List -->
+    <?php if ($candidates->num_rows === 0): ?>
+        <p>No candidates found.</p>
+    <?php else: $i = 1; while ($row = $candidates->fetch_assoc()): ?>
+
+        <div style="display:flex; align-items:center; justify-content:space-between; border:1px solid #ddd; border-radius:8px; padding:14px 16px; margin-bottom:10px; background:#fff;">
+
+            <div style="display:flex; align-items:center; gap:16px;">
+
+                <?php if ($row['photo']): ?>
+                    <img src="../uploads/<?= htmlspecialchars($row['photo']) ?>"
+                         width="60" style="border-radius:6px; flex-shrink:0;" alt="photo">
+                <?php else: ?>
+                    <div style="width:60px; height:60px; background:#eee; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#999; font-size:12px;">
+                        No Photo
+                    </div>
+                <?php endif; ?>
+
+                <div>
+                    <strong><?= htmlspecialchars($row['name']) ?></strong><br>
+                    <span style="font-size:13px; color:#555;">
+                        <?= htmlspecialchars($row['position']) ?> &nbsp;&bull;&nbsp;
+                        <?= htmlspecialchars($row['student_id']) ?> &nbsp;&bull;&nbsp;
+                        <?= htmlspecialchars($row['email']) ?>
+                    </span><br>
+                    <span style="font-size:12px; color:#888;">Added: <?= htmlspecialchars($row['created_at']) ?></span>
+                </div>
+
+            </div>
+
+            <div style="text-align:right; flex-shrink:0; margin-left:16px;">
+
+                <!-- Status of Candidate: Approved or Rejected -->
+                <?php
+                    $badge_color = '#888';
+                    if ($row['status'] === 'approved') $badge_color = 'green';
+                    if ($row['status'] === 'rejected')  $badge_color = 'red';
+                ?>
+                <span style="display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:bold; color:#fff; background:<?= $badge_color ?>; margin-bottom:8px;">
+                    <?= ucfirst($row['status']) ?>
+                </span>
+
+                <br>
+
+                <!-- Actions -->
+                <a href="?view_id=<?= $row['id'] ?><?= isset($_GET['search']) ? '&search=' . urlencode($_GET['search']) : '' ?>">View</a>
+
+                <?php if ($row['status'] !== 'approved'): ?>
+                    &nbsp;|&nbsp;
+                    <a href="?approve_id=<?= $row['id'] ?><?= isset($_GET['search']) ? '&search=' . urlencode($_GET['search']) : '' ?>"
+                       onclick="return confirm('Approve this candidate and add them to the election?')">
+                        Approve
+                    </a>
+                <?php endif; ?>
+
+                <?php if ($row['status'] !== 'rejected'): ?>
+                    &nbsp;|&nbsp;
+                    <a href="?reject_id=<?= $row['id'] ?><?= isset($_GET['search']) ? '&search=' . urlencode($_GET['search']) : '' ?>"
+                       onclick="return confirm('Remove this candidate from the election?')">
+                        Reject
+                    </a>
+                <?php endif; ?>
+
+                <?php if (in_array($_SESSION['role'], ['manager', 'admin'])): ?>
+                    &nbsp;|&nbsp;
+                    <a href="?delete_id=<?= $row['id'] ?><?= isset($_GET['search']) ? '&search=' . urlencode($_GET['search']) : '' ?>"
+                       style="color:red;"
+                       onclick="return confirm('Permanently delete this candidate from the database? This cannot be undone.')">
+                        Remove
+                    </a>
+                <?php endif; ?>
+
+            </div>
+
+        </div>
+
+    <?php endwhile; endif; ?>
+    
+</div>
