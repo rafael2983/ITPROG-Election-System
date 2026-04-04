@@ -1,4 +1,7 @@
 <?php
+
+$allowed_roles = ['committee', 'manager', 'admin'];
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -35,7 +38,7 @@ $role = strtolower($_SESSION['role']);
             <a href="voter_logs.php"><button style="width: 100%; background-color: #34495e; color: white;">View Voter Logs (Audit Trail)</button></a>
         <?php endif; ?>
 
-        <?php if ($role === 'manager' || $role === 'admin'): ?>
+        <?php if (in_array($_SESSION['role'], $allowed_roles)): ?>
             <a href="setup_election.php"><button style="width: 100%; background-color: #34495e; color: white;">Election Timing Setup</button></a>
             <a href="manage_candidates.php"><button style="width: 100%; background-color: #34495e; color: white;">Manage Candidates</button></a>
             <a href="manage_voters.php"><button style="width: 100%; background-color: #34495e; color: white;">Manage Voters</button></a>
