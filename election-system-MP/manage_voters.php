@@ -1,76 +1,147 @@
 <?php
 session_start();
 include("config/db.php");
-
-$role = strtolower($_SESSION['role'] ?? '');
-if ($role !== 'manager' && $role !== 'admin') {
-    header("Location: dashboard.php");
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
     exit();
 }
 
-if (isset($_POST['toggle_status'])) {
-    $user_id = $_POST['user_id'];
-    $current_status = $_POST['current_status'];
-    $new_status = ($current_status == 'active') ? 'inactive' : 'active';
-    $stmt = $conn->prepare("UPDATE users SET status = ? WHERE id = ?");
-    $stmt->bind_param("si", $new_status, $user_id);
-    $stmt->execute();
+$allowed_roles = ['committee', 'manager', 'admin'];
+if (!in_array($_SESSION['role'], $allowed_roles)) {
+    header("Location: unauthorized.php");
+    exit();
 }
 
-if (isset($_POST['remove_id'])) {
-    $remove_id = $_POST['remove_id'];
-    $stmt = $conn->prepare("DELETE FROM users WHERE id = ? AND role = 'student'");
-    $stmt->bind_param("i", $remove_id);
-    $stmt->execute();
+// ── DELETE VOTER (manager and admin only) ────────────────────
+if (isset($_GET['delete_id'])) {
+    if (in_array($_SESSION['role'], ['manager', 'admin'])) {
+        $id = $_GET['delete_id'];
+        if ($conn->query("DELETE FROM users WHERE id='$id' AND role='student'") === TRUE) {
+            echo "<script>alert('Voter permanently deleted.');</script>";
+        } else {
+            echo "Error: " . $conn->error;
+        }
+    } else {
+        echo "<script>alert('Access denied. Only managers and admins can permanently delete voters.');</script>";
+    }
 }
 
-$sql = "SELECT * FROM users WHERE role = 'student' ORDER BY created_at DESC";
-$result = $conn->query($sql);
+// ── FETCH VOTERS ─────────────────────────────────────────────
+$search = isset($_GET['search']) ? "%" . $_GET['search'] . "%" : "%";
+$voters = $conn->query("
+    SELECT  u.id, u.full_name, u.student_id, u.email, u.role, u.created_at,
+            COUNT(DISTINCT CONCAT(v.election_id, '-', v.position_id)) AS total_votes
+    FROM    users u
+    LEFT JOIN votes v ON v.user_id = u.id
+    WHERE   u.role = 'student'
+      AND  (u.full_name LIKE '$search' OR u.email LIKE '$search' OR u.student_id LIKE '$search')
+    GROUP BY u.id
+    ORDER BY u.full_name
+");
+
+// ── FETCH SINGLE VOTER FOR VIEW ───────────────────────────────
+$view_voter = null;
+if (isset($_GET['view_id'])) {
+    $view_voter = $conn->query("
+        SELECT u.id, u.full_name, u.student_id, u.email, u.role, u.created_at,
+               COUNT(DISTINCT CONCAT(v.election_id, '-', v.position_id)) AS total_votes
+        FROM   users u
+        LEFT JOIN votes v ON v.user_id = u.id
+        WHERE  u.id='" . $_GET['view_id'] . "' AND u.role='student'
+        GROUP BY u.id
+    ")->fetch_assoc();
+}
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Manage Voters</title>
-    <link rel="stylesheet" href="assets/style.css">
-</head>
-<body>
-<div class="container" style="width:1000px;">
-    <a href="dashboard.php" style="text-decoration:none; color:#3498db;">← Back</a>
+
+<link rel="stylesheet" href="assets/style.css">
+
+<div class="container" style="width:900px;">
+
     <h2>Voter Management</h2>
-    <table border="1" style="width:100%; border-collapse: collapse; margin-top:20px;">
-        <thead>
-            <tr style="background:#f4f4f4;">
-                <th style="padding:10px;">ID</th>
-                <th style="padding:10px;">Name</th>
-                <th style="padding:10px;">Status</th>
-                <th style="padding:10px;">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php while($row = $result->fetch_assoc()): ?>
-            <tr>
-                <td style="padding:10px;"><?php echo htmlspecialchars($row['student_id']); ?></td>
-                <td style="padding:10px;"><?php echo htmlspecialchars($row['full_name']); ?></td>
-                <td style="padding:10px;"><?php echo strtoupper($row['status'] ?? 'ACTIVE'); ?></td>
-                <td style="padding:10px; display: flex; gap: 5px;">
-                    <a href="edit_voter.php?id=<?php echo $row['id']; ?>"><button style="background:#3498db; color:white; padding:5px;">Edit</button></a>
-                    <form method="POST">
-                        <input type="hidden" name="user_id" value="<?php echo $row['id']; ?>">
-                        <input type="hidden" name="current_status" value="<?php echo $row['status'] ?? 'active'; ?>">
-                        <button type="submit" name="toggle_status" style="background:#f39c12; color:white; padding:5px;">
-                            <?php echo ($row['status'] == 'inactive') ? 'Activate' : 'Deactivate'; ?>
-                        </button>
-                    </form>
-                    <form method="POST" onsubmit="return confirm('Remove voter?');">
-                        <input type="hidden" name="remove_id" value="<?php echo $row['id']; ?>">
-                        <button type="submit" style="background:#e74c3c; color:white; padding:5px;">Remove</button>
-                    </form>
-                </td>
-            </tr>
-            <?php endwhile; ?>
-        </tbody>
-    </table>
+    <p>Logged in as: <strong><?= htmlspecialchars($_SESSION['full_name'] ?? '') ?></strong>
+       &nbsp;|&nbsp; Role: <strong><?= htmlspecialchars($_SESSION['role']) ?></strong></p>
+    <hr style="margin:10px 0 16px;">
+
+    <!-- Search -->
+    <div style="margin-bottom:16px;">
+        <form method="GET" style="display:flex; gap:8px;">
+            <input type="text" name="search" placeholder="Search by name, email, or student ID"
+                   value="<?= htmlspecialchars($_GET['search'] ?? '') ?>"
+                   style="padding:6px 10px; width:300px;">
+            <button type="submit" >Search</button>
+            <a href="voter_management.php"><button type="button">Clear</button></a>
+            <a href="dashboard.php"><button type="button">Dashboard</button></a>
+        </form>
+    </div>
+
+    <!-- View Voter Details -->
+    <?php if ($view_voter): ?>
+    <div style="border:1px solid #ccc; border-radius:8px; padding:20px; margin-bottom:20px; background:#f9f9f9;">
+        <h3 style="margin-bottom:14px;">Voter Details</h3>
+
+        <div style="display:flex; align-items:center; gap:16px; margin-bottom:14px;">
+            <div style="width:70px; height:70px; border-radius:50%; background:#ddd; display:flex; align-items:center; justify-content:center; font-size:26px; color:#888;">
+                &#128100;
+            </div>
+            <div>
+                <strong style="font-size:16px;"><?= htmlspecialchars($view_voter['full_name']) ?></strong><br>
+                <span style="font-size:13px; color:#555;"><?= htmlspecialchars($view_voter['student_id']) ?></span><br>
+                <span style="font-size:13px; color:#555;"><?= htmlspecialchars($view_voter['email']) ?></span><br>
+                <span style="font-size:12px; color:#888;">Registered: <?= htmlspecialchars($view_voter['created_at']) ?></span>
+            </div>
+        </div>
+
+        <p style="margin-top:8px;"><strong>Votes Cast:</strong> <?= $view_voter['total_votes'] ?></p>
+
+        <div style="margin-top:14px;">
+            <a href="voter_management.php<?= isset($_GET['search']) ? '?search=' . urlencode($_GET['search']) : '' ?>">
+                <button type="button">Close</button>
+            </a>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- Voter List -->
+    <?php if ($voters->num_rows === 0): ?>
+        <p>No voters found.</p>
+    <?php else: while ($row = $voters->fetch_assoc()): ?>
+
+        <div style="display:flex; align-items:center; justify-content:space-between; border:1px solid #ddd; border-radius:8px; padding:14px 16px; margin-bottom:10px; background:#fff;">
+
+            <!-- Left: avatar + info -->
+            <div style="display:flex; align-items:center; gap:16px;">
+                <div style="width:50px; height:50px; border-radius:50%; background:#eee; display:flex; align-items:center; justify-content:center; font-size:22px; color:#999; flex-shrink:0;">
+                    &#128100;
+                </div>
+                <div>
+                    <strong><?= htmlspecialchars($row['full_name']) ?></strong><br>
+                    <span style="font-size:13px; color:#555;">
+                        <?= htmlspecialchars($row['student_id']) ?> &nbsp;&bull;&nbsp;
+                        <?= htmlspecialchars($row['email']) ?>
+                    </span><br>
+                    <span style="font-size:12px; color:#888;">
+                        Votes cast: <?= $row['total_votes'] ?> &nbsp;&bull;&nbsp;
+                        Registered: <?= htmlspecialchars($row['created_at']) ?>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Right: actions -->
+            <div style="text-align:right; flex-shrink:0; margin-left:16px;">
+                <a href="?view_id=<?= $row['id'] ?><?= isset($_GET['search']) ? '&search=' . urlencode($_GET['search']) : '' ?>">View</a>
+
+                <?php if (in_array($_SESSION['role'], ['manager', 'admin'])): ?>
+                    &nbsp;|&nbsp;
+                    <a href="?delete_id=<?= $row['id'] ?><?= isset($_GET['search']) ? '&search=' . urlencode($_GET['search']) : '' ?>"
+                       style="color:red;"
+                       onclick="return confirm('Permanently delete this voter and all their votes? This cannot be undone.')">
+                        Delete
+                    </a>
+                <?php endif; ?>
+            </div>
+
+        </div>
+
+    <?php endwhile; endif; ?>
+
 </div>
-</body>
-</html>
