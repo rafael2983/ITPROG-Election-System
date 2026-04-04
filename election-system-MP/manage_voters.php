@@ -12,7 +12,7 @@ if (!in_array($_SESSION['role'], $allowed_roles)) {
     exit();
 }
 
-// ── DELETE VOTER (manager and admin only) ────────────────────
+// Delete Voters
 if (isset($_GET['delete_id'])) {
     if (in_array($_SESSION['role'], ['manager', 'admin'])) {
         $id = $_GET['delete_id'];
@@ -26,7 +26,7 @@ if (isset($_GET['delete_id'])) {
     }
 }
 
-// ── FETCH VOTERS ─────────────────────────────────────────────
+// Fetch Voters
 $search = isset($_GET['search']) ? "%" . $_GET['search'] . "%" : "%";
 $voters = $conn->query("
     SELECT  u.id, u.full_name, u.student_id, u.email, u.role, u.created_at,
@@ -39,7 +39,7 @@ $voters = $conn->query("
     ORDER BY u.full_name
 ");
 
-// ── FETCH SINGLE VOTER FOR VIEW ───────────────────────────────
+// Search for Single Voter
 $view_voter = null;
 if (isset($_GET['view_id'])) {
     $view_voter = $conn->query("
@@ -63,16 +63,14 @@ if (isset($_GET['view_id'])) {
     <hr style="margin:10px 0 16px;">
 
     <!-- Search -->
-    <div style="margin-bottom:16px;">
-        <form method="GET" style="display:flex; gap:8px;">
-            <input type="text" name="search" placeholder="Search by name, email, or student ID"
-                   value="<?= htmlspecialchars($_GET['search'] ?? '') ?>"
-                   style="padding:6px 10px; width:300px;">
-            <button type="submit" >Search</button>
-            <a href="voter_management.php"><button type="button">Clear</button></a>
-            <a href="dashboard.php"><button type="button">Dashboard</button></a>
-        </form>
-    </div>
+    <form method="GET" style="margin-bottom:16px;">
+        <input type="text" name="search" placeholder="Search by name, email, or student ID"
+                value="<?= htmlspecialchars($_GET['search'] ?? '') ?>"
+                style="padding:6px 10px; width:300px;">
+        <button type="submit" >Search</button>
+        <a href="manage_voters.php"><button type="button">Clear</button></a>
+        <a href="dashboard.php"><button type="button">Dashboard</button></a>
+    </form>
 
     <!-- View Voter Details -->
     <?php if ($view_voter): ?>
@@ -94,7 +92,7 @@ if (isset($_GET['view_id'])) {
         <p style="margin-top:8px;"><strong>Votes Cast:</strong> <?= $view_voter['total_votes'] ?></p>
 
         <div style="margin-top:14px;">
-            <a href="voter_management.php<?= isset($_GET['search']) ? '?search=' . urlencode($_GET['search']) : '' ?>">
+            <a href="manage_voters.php<?= isset($_GET['search']) ? '?search=' . urlencode($_GET['search']) : '' ?>">
                 <button type="button">Close</button>
             </a>
         </div>
@@ -108,7 +106,6 @@ if (isset($_GET['view_id'])) {
 
         <div style="display:flex; align-items:center; justify-content:space-between; border:1px solid #ddd; border-radius:8px; padding:14px 16px; margin-bottom:10px; background:#fff;">
 
-            <!-- Left: avatar + info -->
             <div style="display:flex; align-items:center; gap:16px;">
                 <div style="width:50px; height:50px; border-radius:50%; background:#eee; display:flex; align-items:center; justify-content:center; font-size:22px; color:#999; flex-shrink:0;">
                     &#128100;
@@ -126,7 +123,6 @@ if (isset($_GET['view_id'])) {
                 </div>
             </div>
 
-            <!-- Right: actions -->
             <div style="text-align:right; flex-shrink:0; margin-left:16px;">
                 <a href="?view_id=<?= $row['id'] ?><?= isset($_GET['search']) ? '&search=' . urlencode($_GET['search']) : '' ?>">View</a>
 
