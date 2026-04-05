@@ -11,16 +11,6 @@ $user_id = $_SESSION['user_id'];
 $election_id = $_POST['election_id'] ?? 1;
 
 
-// NEW: Final security check for inactive status
-$status_stmt = $conn->prepare("SELECT status FROM users WHERE id = ?");
-$status_stmt->bind_param("i", $user_id);
-$status_stmt->execute();
-$user_data = $status_stmt->get_result()->fetch_assoc();
-
-if ($user_data['status'] === 'inactive') {
-    echo "<script>alert('Your account is deactivated. Submission denied.'); window.location='dashboard.php';</script>";
-    exit();
-}
 
 // 2. Requirement: Double-check for existing votes to prevent bypass
 $check_sql = "SELECT id FROM voter_logs WHERE user_id = ? AND election_id = ? AND action = 'Voted'";
