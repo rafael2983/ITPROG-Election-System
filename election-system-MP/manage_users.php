@@ -120,7 +120,6 @@ if (isset($_GET['view_id'])) {
 
         <div style="display:flex; align-items:center; justify-content:space-between; border:1px solid #ddd; border-radius:8px; padding:14px 16px; margin-bottom:10px; background:#fff;">
 
-            <!-- Left: avatar + info -->
             <div style="display:flex; align-items:center; gap:16px;">
                 <div style="width:50px; height:50px; border-radius:50%; background:#eee; display:flex; align-items:center; justify-content:center; font-size:22px; color:#999; flex-shrink:0;">
                     &#128100;
@@ -138,10 +137,9 @@ if (isset($_GET['view_id'])) {
                 </div>
             </div>
 
-            <!-- Right: role badge + actions -->
             <div style="text-align:right; flex-shrink:0; margin-left:16px;">
 
-                <!-- Role Badge -->
+                <!-- Role: Voter or Candidate -->
                 <?php $badge_color = $row['role'] === 'candidate' ? '#e67e22' : '#27ae60'; ?>
                 <span style="display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:bold; color:#fff; background:<?= $badge_color ?>; margin-bottom:8px;">
                     <?= ucfirst($row['role']) ?>
