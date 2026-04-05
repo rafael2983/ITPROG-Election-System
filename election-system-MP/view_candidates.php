@@ -11,18 +11,6 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $user_id = $_SESSION['user_id'];
-$status_stmt = $conn->prepare("SELECT status FROM users WHERE id = ?");
-$status_stmt->bind_param("i", $user_id);
-$status_stmt->execute();
-$user_data = $status_stmt->get_result()->fetch_assoc();
-
-if (isset($user_data['status']) && $user_data['status'] === 'inactive') {
-    die("<div class='container' style='text-align:center;'>
-            <h2>Account Deactivated</h2>
-            <p>Your account is inactive. You cannot view the candidate list.</p>
-            <a href='dashboard.php'><button>Back to Dashboard</button></a>
-          </div>");
-}
 
 
 $sql = "SELECT candidates.*, positions.position_name 

@@ -9,15 +9,6 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 
-// Eligibility Check: Block deactivated accounts
-$status_stmt = $conn->prepare("SELECT status FROM users WHERE id = ?");
-$status_stmt->bind_param("i", $user_id);
-$status_stmt->execute();
-$user_data = $status_stmt->get_result()->fetch_assoc();
-
-if ($user_data['status'] === 'inactive') {
-    die("<div class='container'><h2>Access Denied</h2><p>Your account is deactivated. You cannot apply.</p><a href='../dashboard.php'>Back</a></div>");
-}
 
 // Fetch the positions we just added via SQL
 $positions_result = $conn->query("SELECT * FROM positions ORDER BY id ASC");

@@ -12,19 +12,6 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 $election_id = 1;
 
-// Eligibility Check: Block inactive users
-$status_stmt = $conn->prepare("SELECT status FROM users WHERE id = ?");
-$status_stmt->bind_param("i", $user_id);
-$status_stmt->execute();
-$user_data = $status_stmt->get_result()->fetch_assoc();
-
-if (isset($user_data['status']) && $user_data['status'] === 'inactive') {
-    die("<div class='container' style='text-align:center;'>
-            <h2>Account Deactivated</h2>
-            <p>Your account is inactive. You cannot cast a vote.</p>
-            <a href='dashboard.php'><button>Back to Dashboard</button></a>
-          </div>");
-}
 
 // Integrity Check: One-time voting per election
 $check_sql = "SELECT id FROM voter_logs WHERE user_id = ? AND election_id = ? AND action = 'Voted'";
