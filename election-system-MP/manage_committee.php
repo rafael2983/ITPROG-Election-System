@@ -85,11 +85,11 @@ if (isset($_GET['view_id'])) {
     <hr style="margin:10px 0 16px;">
 
     <!-- Search & Create -->
-    <form method="GET" style="margin-bottom:16px;">
+    <form method="GET" style="margin-bottom:16px;" style="margin-bottom:16px;">
         <input type="text" name="search" placeholder="Search by name, email, or student ID"
                 value="<?= htmlspecialchars($_GET['search'] ?? '') ?>"
                 style="padding:6px 10px; width:300px;">
-        <button type="submit">Search</button>
+        <button type="submit" >Search</button>
         <a href="manage_committee.php"><button type="button">Clear</button></a>
         <button type="button" onclick="document.getElementById('create-account-form').style.display='block'">Create Account</button>
         <a href="dashboard.php"><button type="button">Dashboard</button></a>
