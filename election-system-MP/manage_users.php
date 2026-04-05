@@ -12,7 +12,7 @@ if (!in_array($_SESSION['role'], $allowed_roles)) {
     exit();
 }
 
-// Delete Users
+// Delete User
 if (isset($_GET['delete_id'])) {
     if (in_array($_SESSION['role'], $allowed_roles)) {
         $id = $_GET['delete_id'];
@@ -26,31 +26,44 @@ if (isset($_GET['delete_id'])) {
     }
 }
 
-// Search
+// Search for Single User
 $search = isset($_GET['search']) ? "%" . $_GET['search'] . "%" : "%";
-$filter = isset($_GET['filter']) && in_array($_GET['filter'], ['student', 'candidate']) ? $_GET['filter'] : '';
-$role_condition = $filter ? "u.role = '$filter'" : "u.role IN ('student', 'candidate')";
+$filter = isset($_GET['filter']) && in_array($_GET['filter'], ['student', 'candidate', 'staff_candidate']) ? $_GET['filter'] : '';
+
+if ($filter === 'student') {
+    $role_condition = "u.role = 'student'";
+} elseif ($filter === 'candidate') {
+    $role_condition = "u.role = 'candidate'";
+} elseif ($filter === 'staff_candidate') {
+    $role_condition = "u.role IN ('committee', 'manager', 'admin') AND c.id IS NOT NULL";
+} else {
+    $role_condition = "u.role IN ('student', 'candidate') OR (u.role IN ('committee', 'manager', 'admin') AND c.id IS NOT NULL)";
+}
 
 $users = $conn->query("
     SELECT  u.id, u.full_name, u.student_id, u.email, u.role, u.created_at,
-            COUNT(DISTINCT CONCAT(v.election_id, '-', v.position_id)) AS total_votes
+            COUNT(DISTINCT CONCAT(v.election_id, '-', v.position_id)) AS total_votes,
+            c.id AS candidate_id, c.position AS candidate_position, c.status AS candidate_status
     FROM    users u
     LEFT JOIN votes v ON v.user_id = u.id
-    WHERE   $role_condition
+    LEFT JOIN candidates c ON c.user_id = u.id
+    WHERE   ($role_condition)
       AND  (u.full_name LIKE '$search' OR u.email LIKE '$search' OR u.student_id LIKE '$search')
     GROUP BY u.id
     ORDER BY u.role, u.full_name
 ");
 
-// Single User View
+// View for Single User
 $view_user = null;
 if (isset($_GET['view_id'])) {
     $view_user = $conn->query("
         SELECT  u.id, u.full_name, u.student_id, u.email, u.role, u.created_at,
-                COUNT(DISTINCT CONCAT(v.election_id, '-', v.position_id)) AS total_votes
+                COUNT(DISTINCT CONCAT(v.election_id, '-', v.position_id)) AS total_votes,
+                c.id AS candidate_id, c.position AS candidate_position, c.status AS candidate_status
         FROM    users u
         LEFT JOIN votes v ON v.user_id = u.id
-        WHERE   u.id='" . $_GET['view_id'] . "' AND u.role IN ('student', 'candidate')
+        LEFT JOIN candidates c ON c.user_id = u.id
+        WHERE   u.id='" . $_GET['view_id'] . "'
         GROUP BY u.id
     ")->fetch_assoc();
 }
@@ -65,15 +78,16 @@ if (isset($_GET['view_id'])) {
        &nbsp;|&nbsp; Role: <strong><?= htmlspecialchars($_SESSION['role']) ?></strong></p>
     <hr style="margin:10px 0 16px;">
 
-    <!-- Search + Filter -->
+    <!-- Search -->
     <form method="GET" action="manage_users.php" style="margin-bottom:16px; display:flex; gap:8px; flex-wrap:wrap;">
         <input type="text" name="search" placeholder="Search by name, email, or student ID"
                value="<?= htmlspecialchars($_GET['search'] ?? '') ?>"
-               style="padding:8px 12px; width:800px;">
+               style="padding:8px 12px; width:280px;">
         <select name="filter" style="padding:8px 12px;">
             <option value="">All Users</option>
-            <option value="student"   <?= ($_GET['filter'] ?? '') === 'student'   ? 'selected' : '' ?>>Students</option>
-            <option value="candidate" <?= ($_GET['filter'] ?? '') === 'candidate' ? 'selected' : '' ?>>Candidates</option>
+            <option value="student"         <?= ($_GET['filter'] ?? '') === 'student'         ? 'selected' : '' ?>>Students</option>
+            <option value="candidate"       <?= ($_GET['filter'] ?? '') === 'candidate'       ? 'selected' : '' ?>>Candidates</option>
+            <option value="staff_candidate" <?= ($_GET['filter'] ?? '') === 'staff_candidate' ? 'selected' : '' ?>>Staff in Candidacy</option>
         </select>
         <button type="submit" style="width:auto;">Search</button>
         <a href="manage_users.php"><button type="button" style="width:auto;">Clear</button></a>
@@ -105,9 +119,22 @@ if (isset($_GET['view_id'])) {
         </p>
         <p style="margin-top:8px;"><strong>Votes Cast:</strong> <?= $view_user['total_votes'] ?></p>
 
+        <?php if ($view_user['candidate_id']): ?>
+        <p style="margin-top:8px;"><strong>Running For:</strong> <?= htmlspecialchars($view_user['candidate_position']) ?>
+            &nbsp;
+            <?php
+                $cs = $view_user['candidate_status'];
+                $cc = $cs === 'approved' ? 'green' : ($cs === 'rejected' ? 'red' : '#888');
+            ?>
+            <span style="display:inline-block; padding:2px 8px; border-radius:20px; font-size:12px; font-weight:bold; color:#fff; background:<?= $cc ?>;">
+                <?= ucfirst($cs) ?>
+            </span>
+        </p>
+        <?php endif; ?>
+
         <div style="margin-top:14px;">
             <a href="manage_users.php<?= isset($_GET['search']) ? '?search=' . urlencode($_GET['search']) : '' ?>">
-                <button type="button" style="padding:6px 14px; font-size:13px;">Close</button>
+                <button type="button" style="padding:8px 18px;">Close</button>
             </a>
         </div>
     </div>
@@ -134,12 +161,18 @@ if (isset($_GET['view_id'])) {
                         Votes cast: <?= $row['total_votes'] ?> &nbsp;&bull;&nbsp;
                         Registered: <?= htmlspecialchars($row['created_at']) ?>
                     </span>
+                    <?php if ($row['candidate_id']): ?>
+                    <br><span style="font-size:12px; color:#c0392b;">
+                        &#9873; Running for: <?= htmlspecialchars($row['candidate_position']) ?>
+                        (<?= ucfirst($row['candidate_status']) ?>)
+                    </span>
+                    <?php endif; ?>
                 </div>
             </div>
 
             <div style="text-align:right; flex-shrink:0; margin-left:16px;">
 
-                <!-- Role: Voter or Candidate -->
+                <!-- Role: Candidate, Student, Or Staff in Candidacy-->
                 <?php $badge_color = $row['role'] === 'candidate' ? '#e67e22' : '#27ae60'; ?>
                 <span style="display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:bold; color:#fff; background:<?= $badge_color ?>; margin-bottom:8px;">
                     <?= ucfirst($row['role']) ?>
