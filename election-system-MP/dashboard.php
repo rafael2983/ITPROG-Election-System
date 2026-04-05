@@ -37,11 +37,15 @@ $role = strtolower($_SESSION['role']);
             <a href="setup_election.php"><button style="width: 100%; background-color: #34495e; color: white;">Election Timing Setup</button></a>
             <a href="manage_candidates.php"><button style="width: 100%; background-color: #34495e; color: white;">Manage Candidates</button></a>
             <a href="manage_voters.php"><button style="width: 100%; background-color: #34495e; color: white;">Manage Voters</button></a>
-            <a href="results.php"><button style="width: 100%; background-color: #2c3e50; color: white;">View Automated Vote Tally</button></a>
         <?php endif; ?>
 
         <?php if ($role == 'manager' || $role == 'admin'): ?>
             <a href="manage_committee.php"><button style="width: 100%; background-color: #34495e; color: white;">Manage Committee</button></a>
+            <a href="manage_users.php"><button style="width: 100%; background-color: #34495e; color: white;">Manage Users</button></a>
+        <?php endif; ?>
+
+        <?php if (in_array($_SESSION['role'], $allowed_roles)): ?>
+            <a href="results.php"><button style="width: 100%; background-color: #2c3e50; color: white;">View Automated Vote Tally</button></a>
         <?php endif; ?>
 
         <hr style="width: 100%; border: 0; border-top: 1px solid #eee; margin: 10px 0;">
