@@ -12,7 +12,7 @@ if (!in_array($_SESSION['role'], $allowed_roles)) {
     exit();
 }
 
-// ── DELETE USER (manager and admin only) ─────────────────────
+// Delete Users
 if (isset($_GET['delete_id'])) {
     if (in_array($_SESSION['role'], $allowed_roles)) {
         $id = $_GET['delete_id'];
@@ -26,7 +26,7 @@ if (isset($_GET['delete_id'])) {
     }
 }
 
-// ── FETCH USERS ──────────────────────────────────────────────
+// Search
 $search = isset($_GET['search']) ? "%" . $_GET['search'] . "%" : "%";
 $filter = isset($_GET['filter']) && in_array($_GET['filter'], ['student', 'candidate']) ? $_GET['filter'] : '';
 $role_condition = $filter ? "u.role = '$filter'" : "u.role IN ('student', 'candidate')";
@@ -42,7 +42,7 @@ $users = $conn->query("
     ORDER BY u.role, u.full_name
 ");
 
-// ── FETCH SINGLE USER FOR VIEW ───────────────────────────────
+// Single User View
 $view_user = null;
 if (isset($_GET['view_id'])) {
     $view_user = $conn->query("
