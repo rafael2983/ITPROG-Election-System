@@ -12,43 +12,49 @@ if (!in_array($_SESSION['role'], $allowed_roles)) {
     exit();
 }
 
-// Delete Voters
+// Delete Votes
 if (isset($_GET['delete_id'])) {
     if (in_array($_SESSION['role'], ['manager', 'admin'])) {
         $id = $_GET['delete_id'];
-        if ($conn->query("DELETE FROM users WHERE id='$id' AND role='student'") === TRUE) {
-            echo "<script>alert('Voter permanently deleted.');</script>";
+        if ($conn->query("DELETE FROM votes WHERE id='$id'") === TRUE) {
+            echo "<script>alert('Vote record deleted.');</script>";
         } else {
             echo "Error: " . $conn->error;
         }
     } else {
-        echo "<script>alert('Access denied. Only managers and admins can permanently delete voters.');</script>";
+        echo "<script>alert('Access denied. Only managers and admins can delete vote records.');</script>";
     }
 }
 
-// Fetch Voters
+// Search for Voter
 $search = isset($_GET['search']) ? "%" . $_GET['search'] . "%" : "%";
-$voters = $conn->query("
-    SELECT  u.id, u.full_name, u.student_id, u.email, u.role, u.created_at,
-            COUNT(DISTINCT CONCAT(v.election_id, '-', v.position_id)) AS total_votes
-    FROM    users u
-    LEFT JOIN votes v ON v.user_id = u.id
-    WHERE   u.role = 'student'
-      AND  (u.full_name LIKE '$search' OR u.email LIKE '$search' OR u.student_id LIKE '$search')
-    GROUP BY u.id
-    ORDER BY u.full_name
+$votes = $conn->query("
+    SELECT  v.id, v.created_at,
+            u.full_name AS voter_name, u.student_id,
+            c.name AS candidate_name,
+            c.position AS position_name,
+            e.title AS election_title
+    FROM    votes v
+    JOIN    users u ON u.id = v.user_id
+    JOIN    candidates c ON c.id = v.candidate_id
+    JOIN    elections e ON e.id = v.election_id
+    WHERE   u.full_name LIKE '$search' OR u.student_id LIKE '$search' OR e.title LIKE '$search' OR c.position LIKE '$search'
+    ORDER BY e.title, c.position, v.created_at DESC
 ");
 
-// Search for Single Voter
-$view_voter = null;
+// Singe Vote View
+$view_vote = null;
 if (isset($_GET['view_id'])) {
-    $view_voter = $conn->query("
-        SELECT u.id, u.full_name, u.student_id, u.email, u.role, u.created_at,
-               COUNT(DISTINCT CONCAT(v.election_id, '-', v.position_id)) AS total_votes
-        FROM   users u
-        LEFT JOIN votes v ON v.user_id = u.id
-        WHERE  u.id='" . $_GET['view_id'] . "' AND u.role='student'
-        GROUP BY u.id
+    $view_vote = $conn->query("
+        SELECT  v.id, v.created_at,
+                u.full_name AS voter_name, u.student_id, u.email,
+                c.name AS candidate_name, c.position AS position_name,
+                e.title AS election_title, e.start_date, e.end_date
+        FROM    votes v
+        JOIN    users u ON u.id = v.user_id
+        JOIN    candidates c ON c.id = v.candidate_id
+        JOIN    elections e ON e.id = v.election_id
+        WHERE   v.id='" . $_GET['view_id'] . "'
     ")->fetch_assoc();
 }
 ?>
@@ -57,80 +63,94 @@ if (isset($_GET['view_id'])) {
 
 <div class="container" style="width:900px;">
 
-    <h2>Voter Management</h2>
+    <h2>Vote Management</h2>
     <p>Logged in as: <strong><?= htmlspecialchars($_SESSION['full_name'] ?? '') ?></strong>
        &nbsp;|&nbsp; Role: <strong><?= htmlspecialchars($_SESSION['role']) ?></strong></p>
     <hr style="margin:10px 0 16px;">
 
     <!-- Search -->
-    <form method="GET" style="margin-bottom:16px;">
-        <input type="text" name="search" placeholder="Search by name, email, or student ID"
-                value="<?= htmlspecialchars($_GET['search'] ?? '') ?>"
-                style="padding:6px 10px; width:300px;">
-        <button type="submit" >Search</button>
+    <form method="GET" action="manage_voters.php" style="margin-bottom:16px;">
+        <input type="text" name="search" placeholder="Search by voter name, student ID, election or position"
+               value="<?= htmlspecialchars($_GET['search'] ?? '') ?>"
+               style="padding:6px 10px; width:300px;">
+        <button type="submit">Search</button>
         <a href="manage_voters.php"><button type="button">Clear</button></a>
         <a href="dashboard.php"><button type="button">Dashboard</button></a>
     </form>
 
-    <!-- View Voter Details -->
-    <?php if ($view_voter): ?>
+    <!-- View Vote Details -->
+    <?php if ($view_vote): ?>
     <div style="border:1px solid #ccc; border-radius:8px; padding:20px; margin-bottom:20px; background:#f9f9f9;">
-        <h3 style="margin-bottom:14px;">Voter Details</h3>
-
-        <div style="display:flex; align-items:center; gap:16px; margin-bottom:14px;">
-            <div style="width:70px; height:70px; border-radius:50%; background:#ddd; display:flex; align-items:center; justify-content:center; font-size:26px; color:#888;">
-                &#128100;
-            </div>
-            <div>
-                <strong style="font-size:16px;"><?= htmlspecialchars($view_voter['full_name']) ?></strong><br>
-                <span style="font-size:13px; color:#555;"><?= htmlspecialchars($view_voter['student_id']) ?></span><br>
-                <span style="font-size:13px; color:#555;"><?= htmlspecialchars($view_voter['email']) ?></span><br>
-                <span style="font-size:12px; color:#888;">Registered: <?= htmlspecialchars($view_voter['created_at']) ?></span>
-            </div>
-        </div>
-
-        <p style="margin-top:8px;"><strong>Votes Cast:</strong> <?= $view_voter['total_votes'] ?></p>
-
-        <div style="margin-top:14px;">
-            <a href="manage_voters.php<?= isset($_GET['search']) ? '?search=' . urlencode($_GET['search']) : '' ?>">
-                <button type="button">Close</button>
-            </a>
-        </div>
+        <h3 style="margin-bottom:14px;">Vote Details</h3>
+        <table cellpadding="8">
+            <tr>
+                <td><strong>Voter</strong></td>
+                <td><?= htmlspecialchars($view_vote['voter_name']) ?></td>
+            </tr>
+            <tr>
+                <td><strong>Student ID</strong></td>
+                <td><?= htmlspecialchars($view_vote['student_id']) ?></td>
+            </tr>
+            <tr>
+                <td><strong>Email</strong></td>
+                <td><?= htmlspecialchars($view_vote['email']) ?></td>
+            </tr>
+            <tr>
+                <td><strong>Voted For</strong></td>
+                <td><?= htmlspecialchars($view_vote['candidate_name']) ?></td>
+            </tr>
+            <tr>
+                <td><strong>Position</strong></td>
+                <td><?= htmlspecialchars($view_vote['position_name']) ?></td>
+            </tr>
+            <tr>
+                <td><strong>Election</strong></td>
+                <td><?= htmlspecialchars($view_vote['election_title']) ?></td>
+            </tr>
+            <tr>
+                <td><strong>Election Period</strong></td>
+                <td><?= htmlspecialchars($view_vote['start_date']) ?> &mdash; <?= htmlspecialchars($view_vote['end_date']) ?></td>
+            </tr>
+            <tr>
+                <td><strong>Voted At</strong></td>
+                <td><?= htmlspecialchars($view_vote['created_at']) ?></td>
+            </tr>
+        </table>
+        <br>
+        <a href="manage_voters.php<?= isset($_GET['search']) ? '?search=' . urlencode($_GET['search']) : '' ?>">
+            <button type="button" style="padding:6px 14px; font-size:13px;">Close</button>
+        </a>
     </div>
     <?php endif; ?>
 
-    <!-- Voter List -->
-    <?php if ($voters->num_rows === 0): ?>
-        <p>No voters found.</p>
-    <?php else: while ($row = $voters->fetch_assoc()): ?>
+    <!-- Vote List -->
+    <?php if ($votes->num_rows === 0): ?>
+        <p>No vote records found.</p>
+    <?php else: while ($row = $votes->fetch_assoc()): ?>
 
         <div style="display:flex; align-items:center; justify-content:space-between; border:1px solid #ddd; border-radius:8px; padding:14px 16px; margin-bottom:10px; background:#fff;">
 
-            <div style="display:flex; align-items:center; gap:16px;">
-                <div style="width:50px; height:50px; border-radius:50%; background:#eee; display:flex; align-items:center; justify-content:center; font-size:22px; color:#999; flex-shrink:0;">
-                    &#128100;
-                </div>
-                <div>
-                    <strong><?= htmlspecialchars($row['full_name']) ?></strong><br>
-                    <span style="font-size:13px; color:#555;">
-                        <?= htmlspecialchars($row['student_id']) ?> &nbsp;&bull;&nbsp;
-                        <?= htmlspecialchars($row['email']) ?>
-                    </span><br>
-                    <span style="font-size:12px; color:#888;">
-                        Votes cast: <?= $row['total_votes'] ?> &nbsp;&bull;&nbsp;
-                        Registered: <?= htmlspecialchars($row['created_at']) ?>
-                    </span>
-                </div>
+            <div>
+                <strong><?= htmlspecialchars($row['voter_name']) ?></strong>
+                <span style="font-size:13px; color:#555;"> &nbsp;&bull;&nbsp; <?= htmlspecialchars($row['student_id']) ?></span><br>
+                <span style="font-size:13px; color:#555;">
+                    Voted for <strong><?= htmlspecialchars($row['candidate_name']) ?></strong>
+                    as <em><?= htmlspecialchars($row['position_name']) ?></em>
+                </span><br>
+                <span style="font-size:12px; color:#888;">
+                    <?= htmlspecialchars($row['election_title']) ?> &nbsp;&bull;&nbsp;
+                    <?= htmlspecialchars($row['created_at']) ?>
+                </span>
             </div>
 
             <div style="text-align:right; flex-shrink:0; margin-left:16px;">
-                <a href="?view_id=<?= $row['id'] ?><?= isset($_GET['search']) ? '&search=' . urlencode($_GET['search']) : '' ?>">View</a>
+                <a href="manage_voters.php?view_id=<?= $row['id'] ?><?= isset($_GET['search']) ? '&search=' . urlencode($_GET['search']) : '' ?>">View</a>
 
                 <?php if (in_array($_SESSION['role'], ['manager', 'admin'])): ?>
                     &nbsp;|&nbsp;
-                    <a href="?delete_id=<?= $row['id'] ?><?= isset($_GET['search']) ? '&search=' . urlencode($_GET['search']) : '' ?>"
+                    <a href="manage_voters.php?delete_id=<?= $row['id'] ?><?= isset($_GET['search']) ? '&search=' . urlencode($_GET['search']) : '' ?>"
                        style="color:red;"
-                       onclick="return confirm('Permanently delete this voter and all their votes? This cannot be undone.')">
+                       onclick="return confirm('Delete this vote record? This cannot be undone.')">
                         Delete
                     </a>
                 <?php endif; ?>
